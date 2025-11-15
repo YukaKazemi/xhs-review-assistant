@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>审核工作台 - 数据面板</title>
+    <style>
+        /* 基础样式 */
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 960px;
+        }
+
+        /* 标题 */
+        header h1 {
+            font-size: 2.5rem;
+            color: #61dafb;
+            margin: 0 0 10px 0;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+        }
+        header p {
+            font-size: 1.1rem;
+            color: #aaa;
+            margin: 0 0 30px 0;
+        }
+
+        /* 统计卡片网格 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background-color: #282c34;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+        .stat-card .label {
+            font-size: 1rem;
+            color: #aaa;
+            margin-bottom: 15px;
+            display: block;
+        }
+        .stat-card .value {
+            font-size: 3rem;
+            font-weight: bold;
+            line-height: 1;
+        }
+        .stat-card .trend {
+            font-size: 1rem;
+            margin-top: 15px;
+            color: #888;
+        }
+        #val-approved { color: #28a745; }
+        #val-rejected { color: #dc3545; }
+        #val-total { color: #61dafb; }
+        #val-pending { color: #ffc107; }
+
+        /* 操作区域 */
+        .actions {
+            background-color: #282c34;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
+        .actions h2 {
+            margin-top: 0;
+            color: #ccc;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+        }
+        .button {
+            background-color: #4a505c;
+            color: #fff;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 1rem;
+            text-align: center;
+        }
+        .button:hover {
+            background-color: #61dafb;
+            color: #1a1a1a;
+        }
+
+        /* 状态指示器 */
+        #status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 12px;
+            background-color: #282c34;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #dc3545; /* Red for disconnected */
+        }
+        .dot.connected {
+            background-color: #28a745; /* Green for connected */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>审核工作台数据面板</h1>
+            <p>实时监控您的审核工作流效率 (数据统计周期: 每日4AM-4AM)</p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="label">今日总审核量</span>
+                <span class="value" id="val-total">-</span>
+                <div class="trend" id="trend-total">vs 昨日: -</div>
+            </div>
+            <div class="stat-card">
+                <span class="label">待复审数量</span>
+                <span class="value" id="val-pending">-</span>
+                <div class="trend">&nbsp;</div>
+            </div>
+            <div class="stat-card">
+                <span class="label">✅ 今日通过</span>
+                <span class="value" id="val-approved">-</span>
+                <div class="trend">&nbsp;</div>
+            </div>
+            <div class="stat-card">
+                <span class="label">❌ 今日不通过</span>
+                <span class="value" id="val-rejected">-</span>
+                <div class="trend">&nbsp;</div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <h2>快捷操作</h2>
+            <div class="button-group">
+                <button class="button" data-action="open" data-key="output">📂 打开工作文件夹</button>
+                <button class="button" data-action="open" data-key="review">📂 打开待复审文件夹</button>
+                <button class="button" data-action="download" data-key="approved">📥 下载"已通过"名单</button>
+                <button class="button" data-action="download" data-key="rejected">📥 下载"未通过"名单</button>
+                <button class="button" data-action="download" data-key="training">📥 下载"待训练"数据</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="status-indicator">
+        <span id="status-text">连接中...</span>
+        <div class="dot" id="status-dot"></div>
+    </div>
+
+    <script>
+        const FLASK_BASE = "http://localhost:5001";
+        const STATS_URL = `${FLASK_BASE}/dashboard_stats`;
+        const OPEN_FOLDER_URL = `${FLASK_BASE}/open_folder`;
+        const DOWNLOAD_FILE_URL = `${FLASK_BASE}/download_file`;
+
+        const statusText = document.getElementById('status-text');
+        const statusDot = document.getElementById('status-dot');
+
+        async function postJSON(url, obj) {
+            try {
+                const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(obj) });
+                if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+                return r.json();
+            } catch (e) {
+                return { ok: false, error: String(e) };
+            }
+        }
+
+        async function updateDashboardData() {
+            try {
+                const response = await fetch(STATS_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                // 更新状态指示器
+                statusText.textContent = '已连接';
+                statusDot.classList.add('connected');
+
+                // 更新统计卡片
+                document.getElementById('val-total').textContent = data.today.total;
+                document.getElementById('val-pending').textContent = data.pending_review;
+                document.getElementById('val-approved').textContent = data.today.approved;
+                document.getElementById('val-rejected').textContent = data.today.rejected;
+                
+                const trendEl = document.getElementById('trend-total');
+                if (data.yesterday.total === 0 && data.today.total > 0) {
+                     trendEl.textContent = `昨日无数据`;
+                } else if (data.yesterday.total > 0) {
+                    const change = ((data.today.total - data.yesterday.total) / data.yesterday.total) * 100;
+                    let trendHTML = '';
+                    if (change > 0) {
+                        trendHTML = `<span style="color: #28a745;">▲ ${change.toFixed(1)}%</span> vs 昨日 (${data.yesterday.total})`;
+                    } else if (change < 0) {
+                        trendHTML = `<span style="color: #dc3545;">▼ ${Math.abs(change).toFixed(1)}%</span> vs 昨日 (${data.yesterday.total})`;
+                    } else {
+                        trendHTML = `持平 vs 昨日 (${data.yesterday.total})`;
+                    }
+                    trendEl.innerHTML = trendHTML;
+                } else {
+                    trendEl.textContent = `vs 昨日: -`;
+                }
+
+            } catch (error) {
+                console.error("Failed to fetch dashboard data:", error);
+                statusText.textContent = '连接失败';
+                statusDot.classList.remove('connected');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 绑定按钮事件
+            document.querySelectorAll('.button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const action = button.dataset.action;
+                    const key = button.dataset.key;
+
+                    if (action === 'open') {
+                        postJSON(OPEN_FOLDER_URL, { key });
+                    } else if (action === 'download') {
+                        window.open(`${DOWNLOAD_FILE_URL}?key=${key}`, '_blank');
+                    }
+                });
+            });
+
+            // 页面加载时立即更新一次，然后每10秒自动刷新
+            updateDashboardData();
+            setInterval(updateDashboardData, 10000);
+        });
+    </script>
+</body>
+</html>
